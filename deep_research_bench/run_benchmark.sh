@@ -12,7 +12,7 @@ QUERY_DATA_PATH="data/prompt_data/query.jsonl"
 LIMIT="--limit 1"
 
 # Skip article cleaning step. Uncomment to enable
-SKIP_CLEANING="--skip_cleaning"
+# SKIP_CLEANING="--skip_cleaning"
 
 # Only process specific language data. Uncomment to enable
 # ONLY_ZH="--only_zh"  # Only process Chinese data

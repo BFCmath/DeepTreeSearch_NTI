@@ -407,6 +407,7 @@ def main():
     
     # chinese data processing
     if not only_en:
+        print("-1")
         logger.info("Starting Chinese data processing...")
         if not skip_cleaning:
             # filter out the processed chinese tasks
@@ -441,6 +442,7 @@ def main():
             logger.info("Skipping article cleaning step for Chinese data.")
     # english data processing
     if not only_zh:
+        print(0)
         logger.info("Starting English data processing...")
         if not skip_cleaning:
             print(1)
@@ -474,10 +476,12 @@ def main():
                 if en_results:
                     all_results.extend(en_results)
         else:
+            print(2)
             logger.info("Skipping article cleaning step for English data.")
     
     # output results to file
     if all_results:
+        print(3)
         # sort by ID
         all_results.sort(key=lambda x: x.get('id', float('inf')))
         

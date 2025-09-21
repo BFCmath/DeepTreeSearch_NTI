@@ -439,7 +439,7 @@ def main():
                     all_results.extend(zh_results)
         else:
             logger.info("Skipping article cleaning step for Chinese data.")
-
+    print("START")
     # english data processing
     if not only_zh:
         logger.info("Starting English data processing...")

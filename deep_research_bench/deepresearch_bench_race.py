@@ -204,7 +204,7 @@ def process_language_data(language, target_model, llm_client, clean_agent,
     """Process data for a single language (Chinese or English)"""
     
     # Step 1: Clean target model articles if needed
-    logger.info(f"Checking if {target_model} articles need cleaning...")
+    print(f"Checking if {target_model} articles need cleaning...")
     try:
         article_cleaner = ArticleCleaner(clean_agent)
         default_language = language
@@ -229,7 +229,7 @@ def process_language_data(language, target_model, llm_client, clean_agent,
         return None
     
     # Step 2: Load data for scoring
-    logger.info(f"Loading {language} data from {query_file}...")
+    print(f"Loading {language} data from {query_file}...")
     
     try:
         all_tasks = load_jsonl(query_file)
@@ -283,7 +283,7 @@ def process_language_data(language, target_model, llm_client, clean_agent,
             logger.error(f"No complete task data found for {language}")
             return None
             
-        logger.info(f"Processing {len(tasks_to_process)} {language} tasks...")
+        print(f"Processing {len(tasks_to_process)} {language} tasks...")
         
     except Exception as e:
         logger.error(f"Error loading data: {str(e)}")
@@ -318,7 +318,7 @@ def process_language_data(language, target_model, llm_client, clean_agent,
     
     successful_results = [res for res in results_list if "error" not in res]
     
-    logger.info(f"{language} evaluation complete. Successfully scored {len(successful_results)} "
+    print(f"{language} evaluation complete. Successfully scored {len(successful_results)} "
                  f"out of {len(tasks_to_process)} tasks.")
     
     return successful_results
@@ -366,11 +366,11 @@ def main():
         try:
             existing_results = load_jsonl(output_file)
             existing_ids = {r.get('id') for r in existing_results if r.get('id')}
-            logger.info(f"Found existing results file with {len(existing_results)} entries")
+            print(f"Found existing results file with {len(existing_results)} entries")
             
             # if limit is specified and the number of existing results is greater than or equal to limit, return
             if limit is not None and len(existing_results) >= limit:
-                logger.info(f"Existing results ({len(existing_results)}) meet or exceed limit ({limit}). Skipping evaluation.")
+                print(f"Existing results ({len(existing_results)}) meet or exceed limit ({limit}). Skipping evaluation.")
                 
                 # calculate and print the average scores of the existing results
                 successful_results = [r for r in existing_results if "error" not in r]
@@ -381,13 +381,13 @@ def main():
                     readability_avg = sum(r.get("readability", 0) for r in successful_results) / len(successful_results)
                     overall_avg = sum(r.get("overall_score", 0) for r in successful_results) / len(successful_results)
                     
-                    logger.info("\n=== Existing Evaluation Results Summary ===")
-                    logger.info(f"Comprehensiveness:      {comprehensiveness_avg:.4f}")
-                    logger.info(f"Insight:                {insight_avg:.4f}")
-                    logger.info(f"Instruction Following:  {instruction_following_avg:.4f}")
-                    logger.info(f"Readability:            {readability_avg:.4f}")
-                    logger.info(f"Overall Score:          {overall_avg:.4f}")
-                    logger.info("================================")
+                    print("\n=== Existing Evaluation Results Summary ===")
+                    print(f"Comprehensiveness:      {comprehensiveness_avg:.4f}")
+                    print(f"Insight:                {insight_avg:.4f}")
+                    print(f"Instruction Following:  {instruction_following_avg:.4f}")
+                    print(f"Readability:            {readability_avg:.4f}")
+                    print(f"Overall Score:          {overall_avg:.4f}")
+                    print("================================")
                 
                 return
         except Exception as e:
@@ -403,17 +403,16 @@ def main():
     # load all tasks, filter out the processed task IDs
     all_tasks = load_jsonl(query_file)
     if existing_ids:
-        logger.info(f"Will skip {len(existing_ids)} already processed task IDs")
+        print(f"Will skip {len(existing_ids)} already processed task IDs")
     
     # chinese data processing
     if not only_en:
-        print("-1")
-        logger.info("Starting Chinese data processing...")
+        print("Starting Chinese data processing...")
         if not skip_cleaning:
             # filter out the processed chinese tasks
             zh_tasks = [task for task in all_tasks if task.get('language') == 'zh' and task.get('id') not in existing_ids]
             if not zh_tasks:
-                logger.info("All Chinese tasks have been processed already. Skipping.")
+                print("All Chinese tasks have been processed already. Skipping.")
             elif limit is not None:
                 # if limit is specified, consider the number of existing results and new tasks
                 existing_zh_count = len([r for r in existing_results if r.get('prompt', '').strip() and 
@@ -421,7 +420,7 @@ def main():
                                            for t in all_tasks)])
                 remaining_limit = max(0, limit - existing_zh_count)
                 if remaining_limit > 0:
-                    logger.info(f"Processing up to {remaining_limit} more Chinese tasks (limit: {limit}, already processed: {existing_zh_count})")
+                    print(f"Processing up to {remaining_limit} more Chinese tasks (limit: {limit}, already processed: {existing_zh_count})")
                     zh_results = process_language_data(
                         "zh", target_model, llm_client, clean_agent,
                         raw_data_dir, cleaned_data_dir, max_workers, remaining_limit, query_file
@@ -429,7 +428,7 @@ def main():
                     if zh_results:
                         all_results.extend(zh_results)
                 else:
-                    logger.info(f"Already reached limit for Chinese tasks ({existing_zh_count}/{limit}). Skipping.")
+                    print(f"Already reached limit for Chinese tasks ({existing_zh_count}/{limit}). Skipping.")
             else:
                 # if limit is not specified, process all unprocessed tasks
                 zh_results = process_language_data( 
@@ -439,17 +438,16 @@ def main():
                 if zh_results:
                     all_results.extend(zh_results)
         else:
-            logger.info("Skipping article cleaning step for Chinese data.")
+            print("Skipping article cleaning step for Chinese data.")
     # english data processing
     if not only_zh:
-        print(0)
-        logger.info("Starting English data processing...")
+        print("Starting English data processing...")
         if not skip_cleaning:
             print(1)
             # filter out the processed english tasks
             en_tasks = [task for task in all_tasks if task.get('language') == 'en' and task.get('id') not in existing_ids]
             if not en_tasks:
-                logger.info("All English tasks have been processed already. Skipping.")
+                print("All English tasks have been processed already. Skipping.")
             elif limit is not None:
                 # if limit is specified, consider the number of existing results and new tasks
                 existing_en_count = len([r for r in existing_results if r.get('prompt', '').strip() and 
@@ -457,7 +455,7 @@ def main():
                                            for t in all_tasks)])
                 remaining_limit = max(0, limit - existing_en_count)
                 if remaining_limit > 0:
-                    logger.info(f"Processing up to {remaining_limit} more English tasks (limit: {limit}, already processed: {existing_en_count})")
+                    print(f"Processing up to {remaining_limit} more English tasks (limit: {limit}, already processed: {existing_en_count})")
                     en_results = process_language_data(
                         "en", target_model, llm_client, clean_agent,
                         raw_data_dir, cleaned_data_dir, max_workers, remaining_limit, query_file
@@ -465,7 +463,7 @@ def main():
                     if en_results:
                         all_results.extend(en_results)
                 else:
-                    logger.info(f"Already reached limit for English tasks ({existing_en_count}/{limit}). Skipping.")
+                    print(f"Already reached limit for English tasks ({existing_en_count}/{limit}). Skipping.")
             else:
                 print(2)
                 # if limit is not specified, process all unprocessed tasks
@@ -476,21 +474,19 @@ def main():
                 if en_results:
                     all_results.extend(en_results)
         else:
-            print(2)
-            logger.info("Skipping article cleaning step for English data.")
+            print("Skipping article cleaning step for English data.")
     
     # output results to file
     if all_results:
-        print(3)
         # sort by ID
         all_results.sort(key=lambda x: x.get('id', float('inf')))
         
-        logger.info(f"Saving {len(all_results)} results to {output_file}...")
+        print(f"Saving {len(all_results)} results to {output_file}...")
         try:
             with open(output_file, 'w', encoding='utf-8') as f:
                 for result in all_results:
                     f.write(json.dumps(result, ensure_ascii=False) + '\n')
-            logger.info("Results saved successfully.")
+            print("Results saved successfully.")
             
             # calculate and print the average scores
             successful_results = [r for r in all_results if "error" not in r]
@@ -502,13 +498,13 @@ def main():
                 readability_avg = sum(r.get("readability", 0) for r in successful_results) / len(successful_results)
                 overall_avg = sum(r.get("overall_score", 0) for r in successful_results) / len(successful_results)
                 
-                logger.info("\n=== Evaluation Results Summary ===")
-                logger.info(f"Comprehensiveness:      {comprehensiveness_avg:.4f}")
-                logger.info(f"Insight:                {insight_avg:.4f}")
-                logger.info(f"Instruction Following:  {instruction_following_avg:.4f}")
-                logger.info(f"Readability:            {readability_avg:.4f}")
-                logger.info(f"Overall Score:          {overall_avg:.4f}")
-                logger.info("================================")
+                print("\n=== Evaluation Results Summary ===")
+                print(f"Comprehensiveness:      {comprehensiveness_avg:.4f}")
+                print(f"Insight:                {insight_avg:.4f}")
+                print(f"Instruction Following:  {instruction_following_avg:.4f}")
+                print(f"Readability:            {readability_avg:.4f}")
+                print(f"Overall Score:          {overall_avg:.4f}")
+                print("================================")
 
                 # write the results to the result file
                 with open(result_file, 'w', encoding='utf-8') as f:
@@ -523,11 +519,11 @@ def main():
     else:
         logger.warning("No results to save.")
     
-    logger.info("--- Run Summary ---")
-    logger.info(f"Target model: {target_model}")
-    logger.info(f"Total tasks processed: {len(all_results)}")
-    logger.info(f"Results file: {output_file}")
-    logger.info("-------------------")
+    print("--- Run Summary ---")
+    print(f"Target model: {target_model}")
+    print(f"Total tasks processed: {len(all_results)}")
+    print(f"Results file: {output_file}")
+    print("-------------------")
 
 if __name__ == "__main__":
     main() 

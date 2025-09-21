@@ -439,11 +439,11 @@ def main():
                     all_results.extend(zh_results)
         else:
             logger.info("Skipping article cleaning step for Chinese data.")
-    print("START")
     # english data processing
     if not only_zh:
         logger.info("Starting English data processing...")
         if not skip_cleaning:
+            print(1)
             # filter out the processed english tasks
             en_tasks = [task for task in all_tasks if task.get('language') == 'en' and task.get('id') not in existing_ids]
             if not en_tasks:
@@ -465,6 +465,7 @@ def main():
                 else:
                     logger.info(f"Already reached limit for English tasks ({existing_en_count}/{limit}). Skipping.")
             else:
+                print(2)
                 # if limit is not specified, process all unprocessed tasks
                 en_results = process_language_data(
                     "en", target_model, llm_client, clean_agent,

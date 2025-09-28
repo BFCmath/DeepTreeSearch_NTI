@@ -200,33 +200,36 @@ def process_single_item(task_data, target_articles_map, reference_articles_map, 
     return final_result
 
 def process_language_data(language, target_model, llm_client, clean_agent, 
-                         raw_data_dir, cleaned_data_dir, max_workers, limit, query_file):
+                         raw_data_dir, cleaned_data_dir, max_workers, limit, query_file,
+                         skip_cleaning=False):
     """Process data for a single language (Chinese or English)"""
     
     # Step 1: Clean target model articles if needed
-    print(f"Checking if {target_model} articles need cleaning...")
-    try:
-        article_cleaner = ArticleCleaner(clean_agent)
-        default_language = language
-
-        article_cleaner.clean_articles(
-            target_model, 
-            raw_data_dir, 
-            cleaned_data_dir, 
-            max_workers,
-            MAX_RETRIES,
-            limit,
-            default_language
+    data_source_dir = cleaned_data_dir
+    if not skip_cleaning:
+        print(f"Checking if {target_model} articles need cleaning...")
+        try:
+            article_cleaner = ArticleCleaner(clean_agent)
+            article_cleaner.clean_articles(
+                target_model, 
+                raw_data_dir, 
+                cleaned_data_dir, 
+                max_workers,
+                MAX_RETRIES,
+                limit,
+                language
             )
-        cleaning_success = True
-    except Exception as e:
-        logger.error(f"Article cleaning failed for {target_model}: {e}")
-        cleaning_success = False
+            cleaning_success = True
+        except Exception as e:
+            logger.error(f"Article cleaning failed for {target_model}: {e}")
+            cleaning_success = False
 
-    
-    if not cleaning_success:
-        logger.error(f"Article cleaning failed for {target_model}, cannot continue.")
-        return None
+        if not cleaning_success:
+            logger.error(f"Article cleaning failed for {target_model}, cannot continue.")
+            return None
+    else:
+        print(f"Skipping article cleaning for {target_model}. Using raw data.")
+        data_source_dir = raw_data_dir
     
     # Step 2: Load data for scoring
     print(f"Loading {language} data from {query_file}...")
@@ -246,8 +249,11 @@ def process_language_data(language, target_model, llm_client, clean_agent,
         all_criteria = load_jsonl(CRITERIA_FILE)
         criteria_list = [c for c in all_criteria if c.get('prompt') in task_prompts]
             
-        # Load target model articles
-        target_file = os.path.join(cleaned_data_dir, f"{target_model}.jsonl")
+        # Load target model articles from the correct directory
+        target_file = os.path.join(data_source_dir, f"{target_model}.jsonl")
+        if not os.path.exists(target_file):
+            logger.error(f"Target article file not found: {target_file}")
+            return None
         all_target_articles = load_jsonl(target_file)
         target_articles_list = [a for a in all_target_articles if a.get('prompt') in task_prompts]
         if not target_articles_list:
@@ -408,71 +414,28 @@ def main():
     # chinese data processing
     if not only_en:
         print("Starting Chinese data processing...")
-        if not skip_cleaning:
-            # filter out the processed chinese tasks
-            zh_tasks = [task for task in all_tasks if task.get('language') == 'zh' and task.get('id') not in existing_ids]
-            if not zh_tasks:
-                print("All Chinese tasks have been processed already. Skipping.")
-            elif limit is not None:
-                # if limit is specified, consider the number of existing results and new tasks
-                existing_zh_count = len([r for r in existing_results if r.get('prompt', '').strip() and 
-                                       any(t.get('prompt') == r.get('prompt') and t.get('language') == 'zh' 
-                                           for t in all_tasks)])
-                remaining_limit = max(0, limit - existing_zh_count)
-                if remaining_limit > 0:
-                    print(f"Processing up to {remaining_limit} more Chinese tasks (limit: {limit}, already processed: {existing_zh_count})")
-                    zh_results = process_language_data(
-                        "zh", target_model, llm_client, clean_agent,
-                        raw_data_dir, cleaned_data_dir, max_workers, remaining_limit, query_file
-                    )
-                    if zh_results:
-                        all_results.extend(zh_results)
-                else:
-                    print(f"Already reached limit for Chinese tasks ({existing_zh_count}/{limit}). Skipping.")
-            else:
-                # if limit is not specified, process all unprocessed tasks
-                zh_results = process_language_data( 
-                    "zh", target_model, llm_client, clean_agent,
-                    raw_data_dir, cleaned_data_dir, max_workers, limit, query_file
-                )
-                if zh_results:
-                    all_results.extend(zh_results)
-        else:
-            print("Skipping article cleaning step for Chinese data.")
+        zh_results = process_language_data(
+            "zh", target_model, llm_client, clean_agent,
+            raw_data_dir, cleaned_data_dir, max_workers, limit, query_file,
+            skip_cleaning=skip_cleaning
+        )
+        if zh_results:
+            # Avoid duplicates if rerunning
+            new_results = [r for r in zh_results if r['id'] not in {res.get('id') for res in all_results}]
+            all_results.extend(new_results)
+
     # english data processing
     if not only_zh:
         print("Starting English data processing...")
-        if not skip_cleaning:
-            # filter out the processed english tasks
-            en_tasks = [task for task in all_tasks if task.get('language') == 'en' and task.get('id') not in existing_ids]
-            if not en_tasks:
-                print("All English tasks have been processed already. Skipping.")
-            elif limit is not None:
-                # if limit is specified, consider the number of existing results and new tasks
-                existing_en_count = len([r for r in existing_results if r.get('prompt', '').strip() and 
-                                       any(t.get('prompt') == r.get('prompt') and t.get('language') == 'en' 
-                                           for t in all_tasks)])
-                remaining_limit = max(0, limit - existing_en_count)
-                if remaining_limit > 0:
-                    print(f"Processing up to {remaining_limit} more English tasks (limit: {limit}, already processed: {existing_en_count})")
-                    en_results = process_language_data(
-                        "en", target_model, llm_client, clean_agent,
-                        raw_data_dir, cleaned_data_dir, max_workers, remaining_limit, query_file
-                    )
-                    if en_results:
-                        all_results.extend(en_results)
-                else:
-                    print(f"Already reached limit for English tasks ({existing_en_count}/{limit}). Skipping.")
-            else:
-                # if limit is not specified, process all unprocessed tasks
-                en_results = process_language_data(
-                    "en", target_model, llm_client, clean_agent,
-                    raw_data_dir, cleaned_data_dir, max_workers, limit, query_file
-                )
-                if en_results:
-                    all_results.extend(en_results)
-        else:
-            print("Skipping article cleaning step for English data.")
+        en_results = process_language_data(
+            "en", target_model, llm_client, clean_agent,
+            raw_data_dir, cleaned_data_dir, max_workers, limit, query_file,
+            skip_cleaning=skip_cleaning
+        )
+        if en_results:
+            # Avoid duplicates if rerunning
+            new_results = [r for r in en_results if r['id'] not in {res.get('id') for res in all_results}]
+            all_results.extend(new_results)
     
     # output results to file
     if all_results:
@@ -524,4 +487,4 @@ def main():
     print("-------------------")
 
 if __name__ == "__main__":
-    main() 
+    main()

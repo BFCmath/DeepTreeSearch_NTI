@@ -1,6 +1,6 @@
 #!/bin/bash
 # Target model name list
-TARGET_MODELS=("claude-3-7-sonnet-test")
+TARGET_MODELS=("zeroshot")
 
 # Common parameters for both RACE and Citation evaluations
 RAW_DATA_DIR="data/test_data/raw_data"
@@ -9,7 +9,7 @@ N_TOTAL_PROCESS=1
 QUERY_DATA_PATH="data/prompt_data/query.jsonl"
 
 # Limit on number of prompts to process (for testing). Uncomment to enable
-LIMIT="--limit 1"
+LIMIT="--limit 10"
 
 # Skip article cleaning step. Uncomment to enable
 # SKIP_CLEANING="--skip_cleaning"

@@ -2,86 +2,103 @@
 
 import os
 import json
+import time
 from dotenv import load_dotenv
 from langchain_google_genai import ChatGoogleGenerativeAI
 from base_framework import run_pipeline
 
 def main():
     """
-    Runs a batch processing pipeline that reads research prompts from a JSONL file,
-    executes the research pipeline for each, and saves the results to an output JSONL file.
+    Runs a batch processing pipeline with performance and resource tracking.
     """
-    # Load environment variables from .env file (for GOOGLE_API_KEY)
     load_dotenv()
-
     if not os.getenv("GOOGLE_API_KEY"):
         raise ValueError("GOOGLE_API_KEY not found in environment variables.")
 
     # --- Configuration ---
-    # 1. Initialize the LLM
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5)
-
-    # 2. Choose the approach to use
-    selected_approach = "zeroshot"
-
-    # 3. Define input and output files
+    selected_approach = "react"
     input_file = "query.jsonl"
     output_dir = "outputs"
-    output_file = os.path.join(output_dir, f"{selected_approach}.jsonl")
-
+    
     # --- File Handling ---
-    # Ensure the output directory exists
     os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, f"{selected_approach}.jsonl")
+    resource_file = os.path.join(output_dir, f"{selected_approach}_resources.txt")
 
-    # Check if input file exists
     if not os.path.exists(input_file):
         print(f"❌ Error: Input file '{input_file}' not found.")
-        print("Please create it with one JSON object per line, like:")
-        print('{"id": 1, "prompt": "Your research topic here"}')
         return
 
-    # --- Batch Processing ---
+    # --- Tracking Initialization ---
+    processing_times = []
+    total_searches = 0
+    total_llm_calls = 0
+
     print(f"🚀 Starting batch processing from '{input_file}'...")
-    print(f"Output will be saved to '{output_file}'.")
+    print(f"Outputs will be saved to '{output_dir}'.")
 
     try:
-        # Use 'a' for append mode to make the process resumable
         with open(input_file, 'r', encoding='utf-8') as f_in, \
-             open(output_file, 'a', encoding='utf-8') as f_out:
+             open(output_file, 'a', encoding='utf-8') as f_out, \
+             open(resource_file, 'w', encoding='utf-8') as f_res:
             
-            for line in f_in:
-                try:
-                    # Load the JSON object from the line
-                    data = json.loads(line.strip())
-                    query_id = data["id"]
-                    research_prompt = data["prompt"]
+            lines = f_in.readlines()
+            
+            for i, line in enumerate(lines):
+                start_time = time.time()
+                
+                data = json.loads(line.strip())
+                query_id = data["id"]
+                research_prompt = data["prompt"]
 
-                    print(f"\nProcessing ID: {query_id} | Prompt: '{research_prompt[:50]}...'")
+                print(f"\n[{i+1}/{len(lines)}] Processing ID: {query_id} | Prompt: '{research_prompt[:50]}...'")
 
-                    # Run the pipeline using the prompt from the file
-                    final_report = run_pipeline(
-                        topic=research_prompt,
-                        model=llm,
-                        approach_name=selected_approach
-                    )
+                result_data = run_pipeline(
+                    topic=research_prompt,
+                    model=llm,
+                    approach_name=selected_approach
+                )
+                
+                end_time = time.time()
+                
+                # --- Extract and store data ---
+                final_report = result_data["article"]
+                output_record = {"id": query_id, "prompt": research_prompt, "article": final_report}
+                f_out.write(json.dumps(output_record) + '\n')
 
-                    # Create the output record
-                    output_record = {
-                        "id": query_id,
-                        "prompt": research_prompt,
-                        "article": final_report
-                    }
+                metadata = result_data["metadata"]
+                duration = end_time - start_time
+                llm_calls = metadata["llm_calls"]
+                search_count = metadata["search_count"]
 
-                    # Write the result as a new line in the output file
-                    f_out.write(json.dumps(output_record) + '\n')
-                    print(f"✅ Successfully processed and saved ID: {query_id}")
+                processing_times.append(duration)
+                total_searches += search_count
+                total_llm_calls += llm_calls
+                
+                # Write individual stats to the resource file
+                f_res.write(f"ID: {query_id}\n")
+                f_res.write(f"  - Total Time: {duration:.2f} seconds\n")
+                f_res.write(f"  - LLM API Calls: {llm_calls}\n")
+                f_res.write(f"  - Searches Conducted: {search_count}\n")
+                f_res.write("---\n")
+                
+                print(f"✅ ID {query_id} finished in {duration:.2f}s. (LLM Calls: {llm_calls}, Searches: {search_count})")
 
-                except json.JSONDecodeError:
-                    print(f"⚠️ Warning: Skipping malformed line: {line.strip()}")
-                except KeyError:
-                    print(f"⚠️ Warning: Skipping line with missing 'id' or 'prompt': {line.strip()}")
-                except Exception as e:
-                    print(f"❌ An unexpected error occurred while processing a line: {e}")
+            # --- Final Summary ---
+            if processing_times:
+                avg_time = sum(processing_times) / len(processing_times)
+                summary = (
+                    f"\n====================\n"
+                    f"  BATCH SUMMARY\n"
+                    f"====================\n"
+                    f"Total Prompts Processed: {len(processing_times)}\n"
+                    f"Average Time per Prompt: {avg_time:.2f} seconds\n"
+                    f"Total LLM API Calls: {total_llm_calls}\n"
+                    f"Total Searches Conducted: {total_searches}\n"
+                )
+                f_res.write(summary)
+                print(summary)
 
     except Exception as e:
         print(f"❌ A critical error occurred: {e}")

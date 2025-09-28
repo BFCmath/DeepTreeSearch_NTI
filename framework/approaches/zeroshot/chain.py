@@ -8,27 +8,12 @@ from langchain_core.tools import BaseTool
 
 from .prompts import QueryList, QUERY_GENERATOR_PROMPT, REPORT_GENERATOR_PROMPT
 
-# --- START OF CHANGE ---
-# This function is now upgraded to handle the structured output from Tavily.
 def _format_search_results(results: list[list[dict]]) -> str:
-    """
-    Formats the structured search results from Tavily into a single string.
-    
-    Args:
-        results: A list where each element is a list of dictionaries, 
-                 with each dictionary representing a search result.
-                 Example: [[{'title': ..., 'content': ...}], [{'title': ..., 'content': ...}]]
-
-    Returns:
-        A formatted string concatenating all search result content.
-    """
+    # ... (this function remains the same as before)
     formatted_string = []
-    # This counter ensures unique numbering for each search snippet.
     result_counter = 1
-    # The input is a list of lists, so we iterate through both.
     for query_results in results:
         for result in query_results:
-            # We extract the content from each result dictionary.
             formatted_string.append(
                 f"Result {result_counter}:\n"
                 f"Title: {result.get('title', 'N/A')}\n"
@@ -36,31 +21,32 @@ def _format_search_results(results: list[list[dict]]) -> str:
                 f"Content: {result.get('content', 'No content available.')}"
             )
             result_counter += 1
-    
     return "\n\n---\n\n".join(formatted_string)
+
+# --- START OF CHANGE ---
+def _structure_final_output(input_dict: dict) -> dict:
+    """Structures the final output to include the article and metadata."""
+    return {
+        "article": input_dict.get("report"),
+        "search_count": len(input_dict.get("queries_object").queries)
+    }
 # --- END OF CHANGE ---
 
 def get_chain(model: BaseChatModel, search_tool: BaseTool) -> Runnable:
     """
-    Constructs and returns the LCEL chain for the zeroshot research approach,
-    now with a reliable Pydantic parser for query generation.
+    Constructs and returns the LCEL chain for the zeroshot research approach.
+    The chain now outputs a dictionary with the final article and search count.
     """
     pydantic_parser = PydanticOutputParser(pydantic_object=QueryList)
 
     generate_queries_chain = (
-        RunnablePassthrough.assign(
-            format_instructions=lambda _: pydantic_parser.get_format_instructions()
-        )
+        RunnablePassthrough.assign(format_instructions=lambda _: pydantic_parser.get_format_instructions())
         | QUERY_GENERATOR_PROMPT
         | model
         | pydantic_parser
     ).with_retry(stop_after_attempt=3)
 
-    generate_report_chain = (
-        REPORT_GENERATOR_PROMPT
-        | model
-        | StrOutputParser()
-    )
+    generate_report_chain = REPORT_GENERATOR_PROMPT | model | StrOutputParser()
 
     zeroshot_chain = (
         {
@@ -77,7 +63,12 @@ def get_chain(model: BaseChatModel, search_tool: BaseTool) -> Runnable:
         | RunnablePassthrough.assign(
             search_results=itemgetter("search_results") | RunnableLambda(_format_search_results)
         )
-        | generate_report_chain
+        # --- START OF CHANGE ---
+        # Instead of ending with the report generator, we assign its output
+        # to a new key 'report' and then structure the final output.
+        | RunnablePassthrough.assign(report=generate_report_chain)
+        | RunnableLambda(_structure_final_output)
+        # --- END OF CHANGE ---
     )
 
     return zeroshot_chain

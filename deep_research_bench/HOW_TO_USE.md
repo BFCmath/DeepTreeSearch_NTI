@@ -42,6 +42,7 @@ This guide explains how to use DeepResearch Bench to evaluate different deep res
   - On Windows PowerShell:
     ```powershell
     $env:GEMINI_API_KEY="your_gemini_api_key_here"
+    $env:TAVILY_API_KEY="your_tavily_api_key_here"
     ```
 
 ---

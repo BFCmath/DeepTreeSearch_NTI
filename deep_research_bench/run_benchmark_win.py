@@ -50,11 +50,13 @@ def main():
         file_handle.flush() # Ensure message is written immediately
 
     # Clear log file by opening in write mode
-    with open(output_log_file, 'w') as f:
+    # FIX: Added encoding='utf-8' to handle non-ASCII characters in logs.
+    with open(output_log_file, 'w', encoding='utf-8') as f:
         f.write(f"Starting benchmark tests, log output to: {output_log_file}\n")
 
     # Open log file in append mode for the rest of the script
-    with open(output_log_file, 'a') as log_file:
+    # FIX: Added encoding='utf-8' here as well.
+    with open(output_log_file, 'a', encoding='utf-8') as log_file:
         # Loop through each model in the target models list
         for target_model in target_models:
             print(f"Running benchmark for target model: {target_model}")
@@ -106,7 +108,8 @@ def main():
                     stdout=log_file,
                     stderr=subprocess.STDOUT, # Redirect stderr to the same place as stdout
                     check=True, # Raise an exception if the command returns a non-zero exit code
-                    text=True   # Write output as text
+                    text=True,   # Write output as text
+                    encoding='utf-8' # FIX: Explicitly set encoding for the subprocess output.
                 )
             except FileNotFoundError:
                 error_msg = f"Error: The command 'python' was not found. Make sure Python is in your PATH."

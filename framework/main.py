@@ -12,12 +12,26 @@ def main():
     Runs a batch processing pipeline with performance and resource tracking.
     """
     load_dotenv()
-    if not os.getenv("GOOGLE_API_KEY"):
-        raise ValueError("GOOGLE_API_KEY not found in environment variables.")
+    
+    # --- Load all available API keys ---
+    api_keys = []
+    main_key = os.getenv("GOOGLE_API_KEY")
+    if main_key:
+        api_keys.append(main_key)
+    
+    # Add additional API keys
+    for i in range(1, 6):
+        key = os.getenv(f"GOOGLE_API{i}_KEY")
+        if key:
+            api_keys.append(key)
+    
+    if not api_keys:
+        raise ValueError("No GOOGLE_API_KEY found in environment variables.")
+    
+    print(f"🔑 Loaded {len(api_keys)} API key(s) for rotation")
 
     # --- Configuration ---
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.5)
-    selected_approach = "react"
+    selected_approach = "minddeepsearch"
     input_file = "query.jsonl"
     output_dir = "outputs"
     
@@ -51,8 +65,16 @@ def main():
                 data = json.loads(line.strip())
                 query_id = data["id"]
                 research_prompt = data["prompt"]
-
-                print(f"\n[{i+1}/{len(lines)}] Processing ID: {query_id} | Prompt: '{research_prompt[:50]}...'")
+                # Rotate API keys: use different key for each query
+                current_api_key = api_keys[i % len(api_keys)]
+                llm = ChatGoogleGenerativeAI(
+                    model="gemini-2.5-flash", 
+                    temperature=0.5,
+                    google_api_key=current_api_key
+                )
+                
+                print(f"\n[{i+1}/{len(lines)}] Processing ID: {query_id} | Using API Key #{(i % len(api_keys)) + 1}")
+                print(f"Prompt: '{research_prompt[:80]}...'")
 
                 result_data = run_pipeline(
                     topic=research_prompt,

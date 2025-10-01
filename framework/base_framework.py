@@ -54,11 +54,14 @@ def run_pipeline(topic: str, model: BaseChatModel, approach_name: str) -> dict:
     print("✅ Pipeline finished successfully.")
 
     # 3. Assemble the final result dictionary with the new metric
+    final_data = chain_output.get("final_output", {})
+    metadata = final_data.get("metadata", {})
+    
     result = {
-        "article": chain_output.get("article", "Error: No article generated."),
+        "article": final_data.get("article", "Error: No article generated."),
         "metadata": {
             "llm_calls": call_counter_callback.llm_calls,
-            "search_count": chain_output.get("search_count", 0)
+            "search_count": metadata.get("search_count", 0)
         }
     }
     

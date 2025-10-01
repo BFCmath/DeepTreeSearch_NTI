@@ -2,15 +2,16 @@
 import os
 import subprocess
 import shlex  # For safely splitting string arguments
+from dotenv import load_dotenv
 
 def main():
     """
     Main function to run the benchmark tests, converted from the original bash script.
     """
     # --- Configuration ---
-
+    load_dotenv()
     # Target model name list
-    target_models = ["zeroshot"]
+    target_models = ["minddeepsearch"]
 
     # Common parameters for both RACE and Citation evaluations
     raw_data_dir = "data/test_data/raw_data"
@@ -23,7 +24,7 @@ def main():
     # To disable, set it to None or an empty string.
 
     # Limit on number of prompts to process (for testing)
-    limit = "--limit 10"
+    limit = "--limit 1"
     # limit = None
 
     # Skip article cleaning step
